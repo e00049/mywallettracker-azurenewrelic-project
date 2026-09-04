@@ -141,3 +141,17 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Local dev
+.env
+db.sqlite3
+__pycache__/
+*.py[cod]
+venv/
+
+# Local dev
+.env
+db.sqlite3
+__pycache__/
+*.py[cod]
+venv/
