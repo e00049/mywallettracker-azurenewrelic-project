@@ -155,3 +155,8 @@ db.sqlite3
 __pycache__/
 *.py[cod]
 venv/
+
+# Frontend
+node_modules/
+dist/
+.env.local
