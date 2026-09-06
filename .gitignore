@@ -165,3 +165,4 @@ dist/
 node_modules/
 dist/
 .env.local
+k8s/01-secrets.yaml
