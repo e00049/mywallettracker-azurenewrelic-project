@@ -160,3 +160,8 @@ venv/
 node_modules/
 dist/
 .env.local
+
+# Frontend
+node_modules/
+dist/
+.env.local
