@@ -165,4 +165,5 @@ dist/
 node_modules/
 dist/
 .env.local
-k8s/01-secrets.yaml
+kubernetes-manifest-files/01-secrets.yaml
+kubernetes-manifest-files/01-secrets.yaml
