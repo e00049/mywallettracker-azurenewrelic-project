@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: mwtacrsid.azurecr.io/mywallettracker-frontend:v1
+          image: mywallettracker02acrrepo.azurecr.io/mywallettracker-frontend:v2
           ports:
             - containerPort: 8080
           readinessProbe:

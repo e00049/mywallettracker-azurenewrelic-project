@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Logo from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -27,7 +28,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
       <form onSubmit={submit} className="w-full max-w-sm bg-white rounded-lg shadow p-8">
-        <h1 className="text-2xl font-semibold mb-1">MyWalletTracker</h1>
+        <div className="mb-1 text-xl"><Logo size={32} /></div>
         <p className="text-sm text-slate-500 mb-6">Sign in to your account</p>
 
         {error && (

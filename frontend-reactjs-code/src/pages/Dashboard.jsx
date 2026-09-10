@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import Charts from "../components/Charts";
+import Footer from "../components/Footer";
+import Logo from "../components/Logo";
 import client from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
@@ -17,6 +20,7 @@ export default function Dashboard() {
   });
   const [newCategory, setNewCategory] = useState("");
   const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const load = async () => {
     try {
@@ -28,6 +32,7 @@ export default function Dashboard() {
       setSummary(s.data);
       setTxns(t.data.results ?? t.data);
       setCategories(c.data.results ?? c.data);
+      setRefreshKey((k) => k + 1);
     } catch {
       setError("Could not load data.");
     }
@@ -69,10 +74,10 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen flex flex-col bg-slate-100">
       <header className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-semibold">MyWalletTracker</h1>
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-xl"><Logo /></h1>
           <div className="flex items-center gap-4 text-sm">
             <span className="text-slate-600">{user?.username}</span>
             <button onClick={logout} className="text-slate-900 underline">Sign out</button>
@@ -80,7 +85,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         {error && (
           <div className="rounded bg-red-50 border border-red-200 text-red-700 text-sm p-3">
             {error}
@@ -97,8 +102,12 @@ export default function Dashboard() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <section className="bg-white rounded-lg shadow p-5 lg:col-span-1 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1 lg:order-1">
+            <Charts summary={summary} refreshKey={refreshKey} />
+          </div>
+
+          <section className="bg-white rounded-lg shadow p-5 lg:col-span-1 lg:order-3 space-y-6">
             <div>
               <h2 className="font-semibold mb-3">Add transaction</h2>
               <form onSubmit={addTxn} className="space-y-3">
@@ -172,7 +181,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="bg-white rounded-lg shadow p-5 lg:col-span-2">
+          <section className="bg-white rounded-lg shadow p-5 lg:col-span-2 lg:order-2">
             <h2 className="font-semibold mb-3">Transactions</h2>
             {txns.length === 0 ? (
               <p className="text-sm text-slate-500">Nothing recorded yet.</p>
@@ -212,8 +221,11 @@ export default function Dashboard() {
               </table>
             )}
           </section>
+
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

@@ -8,4 +8,4 @@ psycopg2-binary==2.9.9
 gunicorn==22.0.0
 
 # Uncomment when wiring up New Relic APM on AKS:
-# newrelic==9.11.0
+newrelic==9.11.0

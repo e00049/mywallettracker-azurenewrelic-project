@@ -12,21 +12,53 @@ spec:
     metadata:
       labels:
         app: backend
+        # Required — without this label the workload identity webhook
+        # won't inject the token, and Key Vault access fails
+        azure.workload.identity/use: "true"
     spec:
+      serviceAccountName: mwt-sa
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
-      # Wait for Postgres before the app's entrypoint tries to migrate
+      # Don't let the app's entrypoint attempt migrations until the
+      # database actually answers. Without this, a transient DNS or
+      # firewall delay turns into a CrashLoopBackOff.
       initContainers:
         - name: wait-for-postgres
           image: postgres:16-alpine
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: mwt-secrets, key: DATABASE_URL}
           command:
             - sh
             - -c
-            - until pg_isready -h postgres -p 5432 -U mwtuser; do echo waiting; sleep 2; done
+            - |
+              # Pull just the host out of the URL — pg_isready is fussy
+              # about full connection strings with query params
+              HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:/?]*\).*|\1|p')
+              echo "Waiting for database at $HOST..."
+              i=0
+              until pg_isready -h "$HOST" -p 5432 -t 3; do
+                i=$((i+1))
+                if [ $i -ge 40 ]; then
+                  echo "Database unreachable after 40 attempts, giving up."
+                  exit 1
+                fi
+                echo "  not ready yet (attempt $i)"
+                sleep 3
+              done
+              echo "Database is up."
+          volumeMounts:
+            - name: kv-secrets
+              mountPath: /mnt/secrets-store
+              readOnly: true
       containers:
         - name: backend
-          image: mwtacrsid.azurecr.io/mywallettracker-backend:v1
+          image: mywallettracker02acrrepo.azurecr.io/mywallettracker-backend:v2
           ports:
             - containerPort: 8000
           env:
@@ -34,23 +66,42 @@ spec:
               value: "False"
             - name: ALLOWED_HOSTS
               value: "*"
+            - name: NEW_RELIC_APP_NAME
+              value: "mywallettracker-backend"
             - name: SECRET_KEY
               valueFrom:
                 secretKeyRef: {name: mwt-secrets, key: SECRET_KEY}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef: {name: mwt-secrets, key: DATABASE_URL}
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom:
+                secretKeyRef: {name: mwt-secrets, key: NEW_RELIC_LICENSE_KEY}
+          # The volume mount is what actually triggers the CSI driver to
+          # fetch from Key Vault. Without it, the mwt-secrets Secret is
+          # never created and the env vars above fail to resolve.
+          volumeMounts:
+            - name: kv-secrets
+              mountPath: /mnt/secrets-store
+              readOnly: true
           readinessProbe:
             httpGet: {path: /api/v1/health/, port: 8000}
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet: {path: /api/v1/health/, port: 8000}
-            initialDelaySeconds: 30
+            initialDelaySeconds: 40
             periodSeconds: 20
           resources:
             requests: {cpu: 100m, memory: 256Mi}
             limits:   {cpu: 500m, memory: 512Mi}
+      volumes:
+        - name: kv-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: mwt-kv-secrets
 ---
 apiVersion: v1
 kind: Service

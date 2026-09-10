@@ -167,3 +167,5 @@ dist/
 .env.local
 kubernetes-manifest-files/01-secrets.yaml
 kubernetes-manifest-files/01-secrets.yaml
+kubernetes-manifest-files/01-secretprovider.yaml
+kubernetes-manifest-files/00-serviceaccount.yaml
