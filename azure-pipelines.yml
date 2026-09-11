@@ -1,0 +1,100 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azureSubscription: 'mywallettracker-adowif-connection'
+  acrName: 'mywallettracker02acrrepo'
+  acrLoginServer: 'mywallettracker02acrrepo.azurecr.io'
+  resourceGroup: 'mywallettracker-azurenewrelic-rg1'
+  aksCluster: 'mywallettracker-03-akscluster'
+  backendImage: 'mywallettracker-backend'
+  frontendImage: 'mywallettracker-frontend'
+  imageTag: '$(Build.BuildId)'
+  viteApiUrl: '/api/v1'
+  k8sNamespace: 'mywallettracker'
+  k8sManifestPath: 'k8s'
+  backendDeployment: 'mywallettracker-backend'
+  backendContainer: 'backend'
+  frontendDeployment: 'mywallettracker-frontend'
+  frontendContainer: 'frontend'
+
+stages:
+  - stage: Build
+    displayName: 'Build & push images to ACR'
+    jobs:
+      - job: backend
+        displayName: 'Backend image'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'az acr build - backend'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az acr build \
+                  --registry $(acrName) \
+                  --image $(backendImage):$(imageTag) \
+                  --image $(backendImage):latest \
+                  backend-django-code
+
+      - job: frontend
+        displayName: 'Frontend image'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'az acr build - frontend'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az acr build \
+                  --registry $(acrName) \
+                  --image $(frontendImage):$(imageTag) \
+                  --image $(frontendImage):latest \
+                  --build-arg VITE_API_URL=$(viteApiUrl) \
+                  frontend-reactjs-code
+
+  - stage: Deploy
+    displayName: 'Deploy to AKS'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: deploy
+        displayName: 'Apply manifests & roll out'
+        environment: 'mywallettracker-aks'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: AzureCLI@2
+                  displayName: 'Deploy to cluster'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      set -e
+                      az aks get-credentials \
+                        --resource-group $(resourceGroup) \
+                        --name $(aksCluster) \
+                        --overwrite-existing
+                      kubectl create namespace $(k8sNamespace) \
+                        --dry-run=client -o yaml | kubectl apply -f -
+                      kubectl apply -n $(k8sNamespace) -f $(k8sManifestPath)/
+                      kubectl set image -n $(k8sNamespace) \
+                        deployment/$(backendDeployment) \
+                        $(backendContainer)=$(acrLoginServer)/$(backendImage):$(imageTag)
+                      kubectl set image -n $(k8sNamespace) \
+                        deployment/$(frontendDeployment) \
+                        $(frontendContainer)=$(acrLoginServer)/$(frontendImage):$(imageTag)
+                      kubectl rollout status -n $(k8sNamespace) \
+                        deployment/$(backendDeployment) --timeout=180s
+                      kubectl rollout status -n $(k8sNamespace) \
+                        deployment/$(frontendDeployment) --timeout=180s
