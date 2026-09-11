@@ -12,15 +12,16 @@ variables:
   acrLoginServer: 'mywallettracker02acrrepo.azurecr.io'
   resourceGroup: 'mywallettracker-azurenewrelic-rg1'
   aksCluster: 'mywallettracker-03-akscluster'
+  wifIdentity: 'mywallettracker-06-wif'
   backendImage: 'mywallettracker-backend'
   frontendImage: 'mywallettracker-frontend'
   imageTag: '$(Build.BuildId)'
   viteApiUrl: '/api/v1'
   k8sNamespace: 'mywallettracker'
   k8sManifestPath: 'kubernetes-manifest-files'
-  backendDeployment: 'mywallettracker-backend'
+  backendDeployment: 'backend'
   backendContainer: 'backend'
-  frontendDeployment: 'mywallettracker-frontend'
+  frontendDeployment: 'frontend'
   frontendContainer: 'frontend'
 
 stages:
@@ -81,19 +82,36 @@ stages:
                     scriptLocation: 'inlineScript'
                     inlineScript: |
                       set -e
+
+                      # Inject the CURRENT identity's clientId (changes every rebuild)
+                      WIF_CLIENT_ID=$(az identity show \
+                        -g $(resourceGroup) -n $(wifIdentity) --query clientId -o tsv)
+                      echo "Injecting WIF clientId: $WIF_CLIENT_ID"
+                      sed -i "s/__WIF_CLIENT_ID__/$WIF_CLIENT_ID/g" \
+                        $(k8sManifestPath)/00-serviceaccount.yaml \
+                        $(k8sManifestPath)/01-secretprovider.yaml
+
                       az aks get-credentials \
                         --resource-group $(resourceGroup) \
                         --name $(aksCluster) \
                         --overwrite-existing
+
                       kubectl create namespace $(k8sNamespace) \
                         --dry-run=client -o yaml | kubectl apply -f -
-                      kubectl apply -n $(k8sNamespace) -f $(k8sManifestPath)/
+
+                      # Explicit list - skips the .example templates, keeps order
+                      kubectl apply -n $(k8sNamespace) -f $(k8sManifestPath)/00-serviceaccount.yaml
+                      kubectl apply -n $(k8sNamespace) -f $(k8sManifestPath)/01-secretprovider.yaml
+                      kubectl apply -n $(k8sNamespace) -f $(k8sManifestPath)/03-backend.yaml
+                      kubectl apply -n $(k8sNamespace) -f $(k8sManifestPath)/04-frontend.yaml
+
                       kubectl set image -n $(k8sNamespace) \
                         deployment/$(backendDeployment) \
                         $(backendContainer)=$(acrLoginServer)/$(backendImage):$(imageTag)
                       kubectl set image -n $(k8sNamespace) \
                         deployment/$(frontendDeployment) \
                         $(frontendContainer)=$(acrLoginServer)/$(frontendImage):$(imageTag)
+
                       kubectl rollout status -n $(k8sNamespace) \
                         deployment/$(backendDeployment) --timeout=180s
                       kubectl rollout status -n $(k8sNamespace) \
