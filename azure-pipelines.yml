@@ -17,7 +17,7 @@ variables:
   imageTag: '$(Build.BuildId)'
   viteApiUrl: '/api/v1'
   k8sNamespace: 'mywallettracker'
-  k8sManifestPath: 'k8s'
+  k8sManifestPath: 'kubernetes-manifest-files'
   backendDeployment: 'mywallettracker-backend'
   backendContainer: 'backend'
   frontendDeployment: 'mywallettracker-frontend'
