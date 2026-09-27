@@ -13,7 +13,7 @@ variables:
   resourceGroup: 'mywallettracker-azurenewrelic-rg'
   aksCluster: 'mywallettracker-03-akscluster'
   wifIdentity: 'mywallettracker-06-wif'
-  wifClientId: 'ac11e55e-9973-4dd7-b110-5893829559ae'
+  wifClientId: 'e189272e-ebe6-479f-ad69-7d90b7902975'
   backendImage: 'mywallettracker-backend'
   frontendImage: 'mywallettracker-frontend'
   imageTag: '$(Build.BuildId)'
